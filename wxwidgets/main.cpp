@@ -47,13 +47,20 @@ public:
         deviceSizer->Add(deviceVersionText, 1, wxEXPAND | wxALL, 5);
         sizer->Add(deviceSizer, 0, wxEXPAND | wxALL, 5);
 
-        // Operation checkboxes
+        // Operation checkboxes and progress bars
         wxStaticBoxSizer* opSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Operations");
+
         eraseCheckBox = new wxCheckBox(panel, wxID_ANY, "Erase");
         blankCheckBox = new wxCheckBox(panel, wxID_ANY, "Blank Check");
         writeCheckBox = new wxCheckBox(panel, wxID_ANY, "Write");
         verifyCheckBox = new wxCheckBox(panel, wxID_ANY, "Verify");
         rebootCheckBox = new wxCheckBox(panel, wxID_ANY, "Reboot");
+
+        eraseProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
+        blankProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
+        writeProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
+        verifyProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
+        rebootProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
 
         eraseCheckBox->SetValue(true);
         blankCheckBox->SetValue(true);
@@ -62,10 +69,15 @@ public:
         rebootCheckBox->SetValue(true);
 
         opSizer->Add(eraseCheckBox, 0, wxALL, 5);
+        opSizer->Add(eraseProgress, 0, wxEXPAND | wxALL, 5);
         opSizer->Add(blankCheckBox, 0, wxALL, 5);
+        opSizer->Add(blankProgress, 0, wxEXPAND | wxALL, 5);
         opSizer->Add(writeCheckBox, 0, wxALL, 5);
+        opSizer->Add(writeProgress, 0, wxEXPAND | wxALL, 5);
         opSizer->Add(verifyCheckBox, 0, wxALL, 5);
+        opSizer->Add(verifyProgress, 0, wxEXPAND | wxALL, 5);
         opSizer->Add(rebootCheckBox, 0, wxALL, 5);
+        opSizer->Add(rebootProgress, 0, wxEXPAND | wxALL, 5);
 
         sizer->Add(opSizer, 0, wxEXPAND | wxALL, 5);
 
@@ -94,6 +106,13 @@ private:
     wxCheckBox* rebootCheckBox;
     wxButton* startButton;
 
+    // Progress bars for each operation
+    wxGauge* eraseProgress;
+    wxGauge* blankProgress;
+    wxGauge* writeProgress;
+    wxGauge* verifyProgress;
+    wxGauge* rebootProgress;
+
     void OnBrowse(wxCommandEvent&) {
         wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (openFileDialog.ShowModal() == wxID_OK) {
@@ -108,20 +127,47 @@ private:
     }
 
     void OnStart(wxCommandEvent&) {
+        // Reset all progress bars to zero at the start
+        eraseProgress->SetValue(0);
+        blankProgress->SetValue(0);
+        writeProgress->SetValue(0);
+        verifyProgress->SetValue(0);
+        rebootProgress->SetValue(0);
+
         if (eraseCheckBox->IsChecked()) {
-            // Add code to erase the device
+            // Simulate a long-running operation for Erase
+            for (int i = 0; i <= 100; i++) {
+                wxMilliSleep(5);  // Faster progress (5 ms delay)
+                eraseProgress->SetValue(i);
+            }
         }
         if (blankCheckBox->IsChecked()) {
-            // Add code to perform a blank check
+            // Simulate a long-running operation for Blank Check
+            for (int i = 0; i <= 100; i++) {
+                wxMilliSleep(5);  // Faster progress (5 ms delay)
+                blankProgress->SetValue(i);
+            }
         }
         if (writeCheckBox->IsChecked()) {
-            // Add code to write to the device
+            // Simulate a long-running operation for Write
+            for (int i = 0; i <= 100; i++) {
+                wxMilliSleep(5);  // Faster progress (5 ms delay)
+                writeProgress->SetValue(i);
+            }
         }
         if (verifyCheckBox->IsChecked()) {
-            // Add code to verify the written data
+            // Simulate a long-running operation for Verify
+            for (int i = 0; i <= 100; i++) {
+                wxMilliSleep(5);  // Faster progress (5 ms delay)
+                verifyProgress->SetValue(i);
+            }
         }
         if (rebootCheckBox->IsChecked()) {
-            // Add code to reboot the device
+            // Simulate a long-running operation for Reboot
+            for (int i = 0; i <= 100; i++) {
+                wxMilliSleep(5);  // Faster progress (5 ms delay)
+                rebootProgress->SetValue(i);
+            }
         }
     }
 
