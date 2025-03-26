@@ -11,7 +11,7 @@
 
 class MyFrame : public wxFrame {
 public:
-    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(400, 350)) {
+    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(800, 700)) {
         wxPanel* panel = new wxPanel(this);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -129,10 +129,6 @@ public:
 };
 
 wxIMPLEMENT_APP(MyApp);
-
-
-
-
 
 
 
