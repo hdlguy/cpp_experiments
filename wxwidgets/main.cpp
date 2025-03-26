@@ -11,7 +11,7 @@
 
 class MyFrame : public wxFrame {
 public:
-    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(400, 200)) {
+    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(400, 300)) {
         wxPanel* panel = new wxPanel(this);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -31,6 +31,28 @@ public:
         netSizer->Add(interfaceChoice, 1, wxEXPAND | wxALL, 5);
         sizer->Add(netSizer, 0, wxEXPAND | wxALL, 5);
 
+        // Operation checkboxes
+        wxStaticBoxSizer* opSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Operations");
+        eraseCheckBox = new wxCheckBox(panel, wxID_ANY, "Erase");
+        blankCheckBox = new wxCheckBox(panel, wxID_ANY, "Blank Check");
+        writeCheckBox = new wxCheckBox(panel, wxID_ANY, "Write");
+        verifyCheckBox = new wxCheckBox(panel, wxID_ANY, "Verify");
+        rebootCheckBox = new wxCheckBox(panel, wxID_ANY, "Reboot");
+
+        eraseCheckBox->SetValue(true);
+        blankCheckBox->SetValue(true);
+        writeCheckBox->SetValue(true);
+        verifyCheckBox->SetValue(true);
+        rebootCheckBox->SetValue(true);
+
+        opSizer->Add(eraseCheckBox, 0, wxALL, 5);
+        opSizer->Add(blankCheckBox, 0, wxALL, 5);
+        opSizer->Add(writeCheckBox, 0, wxALL, 5);
+        opSizer->Add(verifyCheckBox, 0, wxALL, 5);
+        opSizer->Add(rebootCheckBox, 0, wxALL, 5);
+
+        sizer->Add(opSizer, 0, wxEXPAND | wxALL, 5);
+
         panel->SetSizer(sizer);
         LoadNetworkInterfaces();
 
@@ -41,6 +63,11 @@ public:
 private:
     wxTextCtrl* fileTextCtrl;
     wxChoice* interfaceChoice;
+    wxCheckBox* eraseCheckBox;
+    wxCheckBox* blankCheckBox;
+    wxCheckBox* writeCheckBox;
+    wxCheckBox* verifyCheckBox;
+    wxCheckBox* rebootCheckBox;
 
     void OnBrowse(wxCommandEvent&) {
         wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
@@ -79,5 +106,10 @@ public:
 };
 
 wxIMPLEMENT_APP(MyApp);
+
+
+
+
+
 
 
