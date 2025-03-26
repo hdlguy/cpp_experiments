@@ -1,0 +1,83 @@
+#include <wx/wx.h>
+#include <wx/filedlg.h>
+#include <wx/choice.h>
+#include <wx/socket.h>
+#include <wx/dynlib.h>
+#include <vector>
+#include <string>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+
+class MyFrame : public wxFrame {
+public:
+    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(400, 200)) {
+        wxPanel* panel = new wxPanel(this);
+        wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+
+        // File selection
+        wxBoxSizer* fileSizer = new wxBoxSizer(wxHORIZONTAL);
+        fileTextCtrl = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(250, -1));
+        wxButton* browseButton = new wxButton(panel, wxID_ANY, "Browse");
+        fileSizer->Add(fileTextCtrl, 1, wxEXPAND | wxALL, 5);
+        fileSizer->Add(browseButton, 0, wxALL, 5);
+        sizer->Add(fileSizer, 0, wxEXPAND | wxALL, 5);
+
+        // Ethernet interface selection
+        wxBoxSizer* netSizer = new wxBoxSizer(wxHORIZONTAL);
+        wxStaticText* label = new wxStaticText(panel, wxID_ANY, "Select Interface:");
+        interfaceChoice = new wxChoice(panel, wxID_ANY);
+        netSizer->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+        netSizer->Add(interfaceChoice, 1, wxEXPAND | wxALL, 5);
+        sizer->Add(netSizer, 0, wxEXPAND | wxALL, 5);
+
+        panel->SetSizer(sizer);
+        LoadNetworkInterfaces();
+
+        // Bind events
+        browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
+    }
+
+private:
+    wxTextCtrl* fileTextCtrl;
+    wxChoice* interfaceChoice;
+
+    void OnBrowse(wxCommandEvent&) {
+        wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (openFileDialog.ShowModal() == wxID_OK) {
+            fileTextCtrl->SetValue(openFileDialog.GetPath());
+        }
+    }
+
+    void LoadNetworkInterfaces() {
+        struct ifaddrs* ifaddr;
+        if (getifaddrs(&ifaddr) == -1) {
+            wxMessageBox("Error fetching interfaces", "Error", wxICON_ERROR);
+            return;
+        }
+
+        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+            if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET && (ifa->ifa_flags & IFF_UP)) {
+                char ip[INET_ADDRSTRLEN] = {0};
+                struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;
+                inet_ntop(AF_INET, &sa->sin_addr, ip, INET_ADDRSTRLEN);
+                wxString ifaceEntry = wxString::Format("%s (%s)", ifa->ifa_name, ip);
+                interfaceChoice->Append(ifaceEntry);
+            }
+        }
+        freeifaddrs(ifaddr);
+    }
+};
+
+class MyApp : public wxApp {
+public:
+    virtual bool OnInit() {
+        MyFrame* frame = new MyFrame();
+        frame->Show(true);
+        return true;
+    }
+};
+
+wxIMPLEMENT_APP(MyApp);
+
+
