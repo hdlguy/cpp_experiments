@@ -17,8 +17,10 @@ public:
 
         // File selection
         wxBoxSizer* fileSizer = new wxBoxSizer(wxHORIZONTAL);
+        wxStaticText* fileLabel = new wxStaticText(panel, wxID_ANY, "Select File:");
         fileTextCtrl = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(250, -1));
         wxButton* browseButton = new wxButton(panel, wxID_ANY, "Browse");
+        fileSizer->Add(fileLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
         fileSizer->Add(fileTextCtrl, 1, wxEXPAND | wxALL, 5);
         fileSizer->Add(browseButton, 0, wxALL, 5);
         sizer->Add(fileSizer, 0, wxEXPAND | wxALL, 5);
@@ -106,6 +108,14 @@ public:
 };
 
 wxIMPLEMENT_APP(MyApp);
+
+
+
+
+
+
+
+
 
 
 
