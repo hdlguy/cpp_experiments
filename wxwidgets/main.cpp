@@ -33,12 +33,14 @@ public:
         netSizer->Add(interfaceChoice, 1, wxEXPAND | wxALL, 5);
         sizer->Add(netSizer, 0, wxEXPAND | wxALL, 5);
 
-        // Device ID and Version fields
+        // Device ID and Version fields with button
         wxBoxSizer* deviceSizer = new wxBoxSizer(wxHORIZONTAL);
+        wxButton* fetchDeviceInfoButton = new wxButton(panel, wxID_ANY, "Fetch Info");
         wxStaticText* idLabel = new wxStaticText(panel, wxID_ANY, "Device ID:");
         deviceIDText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
         wxStaticText* versionLabel = new wxStaticText(panel, wxID_ANY, "Version:");
         deviceVersionText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
+        deviceSizer->Add(fetchDeviceInfoButton, 0, wxALL, 5);
         deviceSizer->Add(idLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
         deviceSizer->Add(deviceIDText, 1, wxEXPAND | wxALL, 5);
         deviceSizer->Add(versionLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
@@ -67,12 +69,17 @@ public:
 
         sizer->Add(opSizer, 0, wxEXPAND | wxALL, 5);
 
+        // Start button
+        startButton = new wxButton(panel, wxID_ANY, "Start");
+        sizer->Add(startButton, 0, wxALIGN_CENTER | wxALL, 10);
+
         panel->SetSizer(sizer);
         LoadNetworkInterfaces();
 
         // Bind events
         browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
-        interfaceChoice->Bind(wxEVT_CHOICE, &MyFrame::OnInterfaceSelected, this);
+        fetchDeviceInfoButton->Bind(wxEVT_BUTTON, &MyFrame::OnFetchDeviceInfo, this);
+        startButton->Bind(wxEVT_BUTTON, &MyFrame::OnStart, this);
     }
 
 private:
@@ -85,11 +92,36 @@ private:
     wxCheckBox* writeCheckBox;
     wxCheckBox* verifyCheckBox;
     wxCheckBox* rebootCheckBox;
+    wxButton* startButton;
 
     void OnBrowse(wxCommandEvent&) {
         wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (openFileDialog.ShowModal() == wxID_OK) {
             fileTextCtrl->SetValue(openFileDialog.GetPath());
+        }
+    }
+
+    void OnFetchDeviceInfo(wxCommandEvent&) {
+        // Example code to set values
+        deviceIDText->SetValue("12345");
+        deviceVersionText->SetValue("1.0.0");
+    }
+
+    void OnStart(wxCommandEvent&) {
+        if (eraseCheckBox->IsChecked()) {
+            // Add code to erase the device
+        }
+        if (blankCheckBox->IsChecked()) {
+            // Add code to perform a blank check
+        }
+        if (writeCheckBox->IsChecked()) {
+            // Add code to write to the device
+        }
+        if (verifyCheckBox->IsChecked()) {
+            // Add code to verify the written data
+        }
+        if (rebootCheckBox->IsChecked()) {
+            // Add code to reboot the device
         }
     }
 
@@ -111,18 +143,9 @@ private:
         }
         freeifaddrs(ifaddr);
     }
-
-    void OnInterfaceSelected(wxCommandEvent&) {
-        // This function is called when the user selects a network interface
-        // You should add your network device interrogation code here
-        // Use the selected interface to communicate with the device and obtain its ID and version
-
-        // Example placeholder values - replace these with actual values retrieved from the device
-        deviceIDText->SetValue("123456");
-        deviceVersionText->SetValue("1.0");
-    }
 };
 
+// Declare the app class before using wxIMPLEMENT_APP
 class MyApp : public wxApp {
 public:
     virtual bool OnInit() {
@@ -133,9 +156,5 @@ public:
 };
 
 wxIMPLEMENT_APP(MyApp);
-
-
-
-
 
 
