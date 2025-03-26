@@ -11,7 +11,7 @@
 
 class MyFrame : public wxFrame {
 public:
-    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(400, 300)) {
+    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(400, 350)) {
         wxPanel* panel = new wxPanel(this);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -32,6 +32,18 @@ public:
         netSizer->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
         netSizer->Add(interfaceChoice, 1, wxEXPAND | wxALL, 5);
         sizer->Add(netSizer, 0, wxEXPAND | wxALL, 5);
+
+        // Device ID and Version fields
+        wxBoxSizer* deviceSizer = new wxBoxSizer(wxHORIZONTAL);
+        wxStaticText* idLabel = new wxStaticText(panel, wxID_ANY, "Device ID:");
+        deviceIDText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
+        wxStaticText* versionLabel = new wxStaticText(panel, wxID_ANY, "Version:");
+        deviceVersionText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
+        deviceSizer->Add(idLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+        deviceSizer->Add(deviceIDText, 1, wxEXPAND | wxALL, 5);
+        deviceSizer->Add(versionLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+        deviceSizer->Add(deviceVersionText, 1, wxEXPAND | wxALL, 5);
+        sizer->Add(deviceSizer, 0, wxEXPAND | wxALL, 5);
 
         // Operation checkboxes
         wxStaticBoxSizer* opSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Operations");
@@ -60,11 +72,14 @@ public:
 
         // Bind events
         browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
+        interfaceChoice->Bind(wxEVT_CHOICE, &MyFrame::OnInterfaceSelected, this);
     }
 
 private:
     wxTextCtrl* fileTextCtrl;
     wxChoice* interfaceChoice;
+    wxTextCtrl* deviceIDText;
+    wxTextCtrl* deviceVersionText;
     wxCheckBox* eraseCheckBox;
     wxCheckBox* blankCheckBox;
     wxCheckBox* writeCheckBox;
@@ -96,6 +111,12 @@ private:
         }
         freeifaddrs(ifaddr);
     }
+
+    void OnInterfaceSelected(wxCommandEvent&) {
+        // Placeholder: Replace this with actual interrogation code
+        deviceIDText->SetValue("123456");
+        deviceVersionText->SetValue("1.0");
+    }
 };
 
 class MyApp : public wxApp {
@@ -108,9 +129,6 @@ public:
 };
 
 wxIMPLEMENT_APP(MyApp);
-
-
-
 
 
 
