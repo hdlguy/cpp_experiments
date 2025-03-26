@@ -113,7 +113,11 @@ private:
     }
 
     void OnInterfaceSelected(wxCommandEvent&) {
-        // Placeholder: Replace this with actual interrogation code
+        // This function is called when the user selects a network interface
+        // You should add your network device interrogation code here
+        // Use the selected interface to communicate with the device and obtain its ID and version
+
+        // Example placeholder values - replace these with actual values retrieved from the device
         deviceIDText->SetValue("123456");
         deviceVersionText->SetValue("1.0");
     }
@@ -129,8 +133,6 @@ public:
 };
 
 wxIMPLEMENT_APP(MyApp);
-
-
 
 
 
