@@ -7,15 +7,41 @@
 
 using boost::asio::ip::udp;
 
+void SetIPAddress(const std::string& interface, const std::string& ipAddress)
+{
+    std::string command;
+    
+    #ifdef __linux__
+        command = "sudo ifconfig " + interface + " " + ipAddress;
+    #elif _WIN32
+        command = "netsh interface ip set address name=\"" + interface + "\" static " + ipAddress + " 255.255.255.0";
+    #else
+        std::cerr << "Unsupported platform" << std::endl;
+        return;
+    #endif
+
+    if (system(command.c_str()) != 0) {
+        std::cerr << "Error setting IP address" << std::endl;
+        exit(1);
+    } else {
+        std::cerr << "interface = " << interface << ", IP address = " << ipAddress << std::endl;
+    }
+}
+
 int main()
 {
-    std::string server_ip = "16.0.0.128";  // Replace with the server's IP
+    std::string network_interface = "enx94103eb7e201";
+    std::string pc_ip     = "16.0.0.200";  
+    std::string device_ip = "16.0.0.128"; 
     int port = 1234;
+
+    // Set IP address on network interface 
+    SetIPAddress(network_interface, pc_ip);
 
     // setup tx socket
     boost::asio::io_service tx_io_service;
     udp::socket tx_socket(tx_io_service);
-    udp::endpoint device_endpoint(boost::asio::ip::address::from_string(server_ip), port);
+    udp::endpoint device_endpoint(boost::asio::ip::address::from_string(device_ip), port);
     tx_socket.open(udp::v4());
 
     // setup rx socket
