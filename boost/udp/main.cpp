@@ -5,6 +5,8 @@
 #define     UDP_STAT_CON        9
 #define     UDP_STAT_REQ        10
 
+#define     BUF_LEN             2048
+
 using boost::asio::ip::udp;
 
 void SetIPAddress(const std::string& interface, const std::string& ipAddress);
@@ -12,6 +14,7 @@ void SetIPAddress(const std::string& interface, const std::string& ipAddress);
 
 int main()
 {
+    // network settings
     std::string network_interface = "enx94103eb7e201";
     std::string pc_ip     = "16.0.0.200";  
     std::string device_ip = "16.0.0.128"; 
@@ -31,25 +34,26 @@ int main()
     udp::socket rx_socket(rx_io_service, udp::endpoint(udp::v4(), port));
     std::cout << "UDP server listening on port " << port << "..." << std::endl;
 
-
     // send packet
-    char txbuf[2048];
+    char txbuf[BUF_LEN];
     txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
     tx_socket.send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
 
     // receive packets
-    char rxbuf[1024];
+    char rxbuf[BUF_LEN];
+    uint32_t* rxregbuf = (uint32_t *)rxbuf;
     udp::endpoint remote_endpoint;
     uint8_t fpga_source;
     do {
-
         size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
         fpga_source = rxbuf[3];
-
     } while (fpga_source != UDP_STAT_CON);
 
 
-    printf("fpga_source = 0x%02x", fpga_source);
+    // print received values
+    uint32_t fpga_id, fpga_version;
+    fpga_version = rxregbuf[1]; fpga_id = rxregbuf[2]; 
+    printf("fpga_source = 0x%02x, fpga_id = 0x%08x, fpga_version = 0x%08x", fpga_source, fpga_id, fpga_version);
     std::cout << " from " << remote_endpoint << std::endl;
 
     return 0;
