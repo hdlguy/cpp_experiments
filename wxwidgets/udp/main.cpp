@@ -122,13 +122,13 @@ int main()
     PLATFORM_INIT();
 
     // Set the IP address of the network interface (Linux specific)
-    SetIPAddress("enx94103eb7e201", "10.0.0.200");  // Set IP on 'enx94103eb7e201'
+    SetIPAddress("enx94103eb7e201", "16.0.0.200");  // Set IP on 'enx94103eb7e201'
 
     // Send UDP packet to device at 10.0.0.128
-    SendUDPPacket("10.0.0.128", 12345);
+    SendUDPPacket("16.0.0.128", 1234);
 
     //// Optionally, receive a UDP packet
-    //ReceiveUDPPacket(12345);
+    //ReceiveUDPPacket(1234);
 
     PLATFORM_CLEANUP();
 
