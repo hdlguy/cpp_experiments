@@ -1,206 +1,138 @@
-#include <wx/wx.h>
-#include <wx/filedlg.h>
-#include <wx/choice.h>
-#include <wx/socket.h>
-#include <wx/dynlib.h>
-#include <vector>
-#include <string>
-#include <ifaddrs.h>
-#include <net/if.h>
-#include <arpa/inet.h>
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
 
-class MyFrame : public wxFrame {
-public:
-    MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(800, 700)) {
-        wxPanel* panel = new wxPanel(this);
-        wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+#ifdef __linux__
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <unistd.h>
+#elif _WIN32
+    #include <winsock2.h>
+    #include <windows.h>
+#endif
 
-        // File selection
-        wxBoxSizer* fileSizer = new wxBoxSizer(wxHORIZONTAL);
-        wxStaticText* fileLabel = new wxStaticText(panel, wxID_ANY, "Select File:");
-        fileTextCtrl = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(250, -1));
-        wxButton* browseButton = new wxButton(panel, wxID_ANY, "Browse");
-        fileSizer->Add(fileLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
-        fileSizer->Add(fileTextCtrl, 1, wxEXPAND | wxALL, 5);
-        fileSizer->Add(browseButton, 0, wxALL, 5);
-        sizer->Add(fileSizer, 0, wxEXPAND | wxALL, 5);
+// Platform-specific initialization and cleanup
+#ifdef __linux__
+    #define PLATFORM_INIT()   (void)0
+    #define PLATFORM_CLEANUP() (void)0
+#elif _WIN32
+    #define PLATFORM_INIT()    \
+        WSADATA wsaData;       \
+        WSAStartup(MAKEWORD(2, 2), &wsaData);
+    #define PLATFORM_CLEANUP() WSACleanup();
+#endif
 
-        // Ethernet interface selection
-        wxBoxSizer* netSizer = new wxBoxSizer(wxHORIZONTAL);
-        wxStaticText* label = new wxStaticText(panel, wxID_ANY, "Select Interface:");
-        interfaceChoice = new wxChoice(panel, wxID_ANY);
-        netSizer->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
-        netSizer->Add(interfaceChoice, 1, wxEXPAND | wxALL, 5);
-        sizer->Add(netSizer, 0, wxEXPAND | wxALL, 5);
+// Function to set IP address (platform-specific)
+void SetIPAddress(const std::string& interface, const std::string& ipAddress)
+{
+    std::string command;
+    
+    #ifdef __linux__
+        command = "sudo ifconfig " + interface + " " + ipAddress;
+    #elif _WIN32
+        command = "netsh interface ip set address name=\"" + interface + "\" static " + ipAddress + " 255.255.255.0";
+    #else
+        std::cerr << "Unsupported platform" << std::endl;
+        return;
+    #endif
 
-        // Device ID and Version fields with button
-        wxBoxSizer* deviceSizer = new wxBoxSizer(wxHORIZONTAL);
-        wxButton* fetchDeviceInfoButton = new wxButton(panel, wxID_ANY, "Fetch Info");
-        wxStaticText* idLabel = new wxStaticText(panel, wxID_ANY, "Device ID:");
-        deviceIDText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
-        wxStaticText* versionLabel = new wxStaticText(panel, wxID_ANY, "Version:");
-        deviceVersionText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
-        deviceSizer->Add(fetchDeviceInfoButton, 0, wxALL, 5);
-        deviceSizer->Add(idLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
-        deviceSizer->Add(deviceIDText, 1, wxEXPAND | wxALL, 5);
-        deviceSizer->Add(versionLabel, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
-        deviceSizer->Add(deviceVersionText, 1, wxEXPAND | wxALL, 5);
-        sizer->Add(deviceSizer, 0, wxEXPAND | wxALL, 5);
+    if (system(command.c_str()) != 0)
+    {
+        std::cerr << "Error setting IP address" << std::endl;
+        exit(1);
+    }
+}
 
-        // Operation checkboxes and progress bars
-        wxStaticBoxSizer* opSizer = new wxStaticBoxSizer(wxVERTICAL, panel, "Operations");
+void SendUDPPacket(const std::string& server_ip, int port)
+{
+    // Create socket
+    int sockfd;
+    struct sockaddr_in servaddr;
 
-        eraseCheckBox = new wxCheckBox(panel, wxID_ANY, "Erase");
-        blankCheckBox = new wxCheckBox(panel, wxID_ANY, "Blank Check");
-        writeCheckBox = new wxCheckBox(panel, wxID_ANY, "Write");
-        verifyCheckBox = new wxCheckBox(panel, wxID_ANY, "Verify");
-        rebootCheckBox = new wxCheckBox(panel, wxID_ANY, "Reboot");
-
-        eraseProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
-        blankProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
-        writeProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
-        verifyProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
-        rebootProgress = new wxGauge(panel, wxID_ANY, 100, wxDefaultPosition, wxSize(200, 20));
-
-        eraseCheckBox->SetValue(true);
-        blankCheckBox->SetValue(true);
-        writeCheckBox->SetValue(true);
-        verifyCheckBox->SetValue(true);
-        rebootCheckBox->SetValue(true);
-
-        opSizer->Add(eraseCheckBox, 0, wxALL, 5);
-        opSizer->Add(eraseProgress, 0, wxEXPAND | wxALL, 5);
-        opSizer->Add(blankCheckBox, 0, wxALL, 5);
-        opSizer->Add(blankProgress, 0, wxEXPAND | wxALL, 5);
-        opSizer->Add(writeCheckBox, 0, wxALL, 5);
-        opSizer->Add(writeProgress, 0, wxEXPAND | wxALL, 5);
-        opSizer->Add(verifyCheckBox, 0, wxALL, 5);
-        opSizer->Add(verifyProgress, 0, wxEXPAND | wxALL, 5);
-        opSizer->Add(rebootCheckBox, 0, wxALL, 5);
-        opSizer->Add(rebootProgress, 0, wxEXPAND | wxALL, 5);
-
-        sizer->Add(opSizer, 0, wxEXPAND | wxALL, 5);
-
-        // Start button
-        startButton = new wxButton(panel, wxID_ANY, "Start");
-        sizer->Add(startButton, 0, wxALIGN_CENTER | wxALL, 10);
-
-        panel->SetSizer(sizer);
-        LoadNetworkInterfaces();
-
-        // Bind events
-        browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
-        fetchDeviceInfoButton->Bind(wxEVT_BUTTON, &MyFrame::OnFetchDeviceInfo, this);
-        startButton->Bind(wxEVT_BUTTON, &MyFrame::OnStart, this);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0)
+    {
+        std::cerr << "Error creating socket" << std::endl;
+        exit(1);
     }
 
-private:
-    wxTextCtrl* fileTextCtrl;
-    wxChoice* interfaceChoice;
-    wxTextCtrl* deviceIDText;
-    wxTextCtrl* deviceVersionText;
-    wxCheckBox* eraseCheckBox;
-    wxCheckBox* blankCheckBox;
-    wxCheckBox* writeCheckBox;
-    wxCheckBox* verifyCheckBox;
-    wxCheckBox* rebootCheckBox;
-    wxButton* startButton;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(port);
+    servaddr.sin_addr.s_addr = inet_addr(server_ip.c_str());
 
-    // Progress bars for each operation
-    wxGauge* eraseProgress;
-    wxGauge* blankProgress;
-    wxGauge* writeProgress;
-    wxGauge* verifyProgress;
-    wxGauge* rebootProgress;
-
-    void OnBrowse(wxCommandEvent&) {
-        wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-        if (openFileDialog.ShowModal() == wxID_OK) {
-            fileTextCtrl->SetValue(openFileDialog.GetPath());
-        }
+    // Send message
+    const char* message = "Hello, Device!";
+    if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0)
+    {
+        std::cerr << "Error sending message" << std::endl;
+        close(sockfd);
+        return;
     }
 
-    void OnFetchDeviceInfo(wxCommandEvent&) {
-        // Example code to set values
-        deviceIDText->SetValue("12345");
-        deviceVersionText->SetValue("1.0.0");
+    std::cout << "UDP packet sent to " << server_ip << std::endl;
+    close(sockfd);
+}
+
+void ReceiveUDPPacket(int port)
+{
+    // Create socket
+    int sockfd;
+    struct sockaddr_in servaddr, cliaddr;
+    socklen_t len;
+    char buffer[1024];
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0)
+    {
+        std::cerr << "Error creating socket" << std::endl;
+        exit(1);
     }
 
-    void OnStart(wxCommandEvent&) {
-        // Reset all progress bars to zero at the start
-        eraseProgress->SetValue(0);
-        blankProgress->SetValue(0);
-        writeProgress->SetValue(0);
-        verifyProgress->SetValue(0);
-        rebootProgress->SetValue(0);
+    memset(&servaddr, 0, sizeof(servaddr));
 
-        if (eraseCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Erase
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                eraseProgress->SetValue(i);
-            }
-        }
-        if (blankCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Blank Check
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                blankProgress->SetValue(i);
-            }
-        }
-        if (writeCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Write
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                writeProgress->SetValue(i);
-            }
-        }
-        if (verifyCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Verify
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                verifyProgress->SetValue(i);
-            }
-        }
-        if (rebootCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Reboot
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                rebootProgress->SetValue(i);
-            }
-        }
+    // Bind the socket to the port
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_port = htons(port);
+    if (bind(sockfd, (const struct sockaddr*)&servaddr, sizeof(servaddr)) < 0)
+    {
+        std::cerr << "Bind failed" << std::endl;
+        close(sockfd);
+        exit(1);
     }
 
-    void LoadNetworkInterfaces() {
-        struct ifaddrs* ifaddr;
-        if (getifaddrs(&ifaddr) == -1) {
-            wxMessageBox("Error fetching interfaces", "Error", wxICON_ERROR);
-            return;
-        }
-
-        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-            if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET && (ifa->ifa_flags & IFF_UP)) {
-                char ip[INET_ADDRSTRLEN] = {0};
-                struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;
-                inet_ntop(AF_INET, &sa->sin_addr, ip, INET_ADDRSTRLEN);
-                wxString ifaceEntry = wxString::Format("%s (%s)", ifa->ifa_name, ip);
-                interfaceChoice->Append(ifaceEntry);
-            }
-        }
-        freeifaddrs(ifaddr);
+    len = sizeof(cliaddr);
+    int n = recvfrom(sockfd, (char*)buffer, sizeof(buffer), 0, (struct sockaddr*)&cliaddr, &len);
+    if (n < 0)
+    {
+        std::cerr << "Error receiving message" << std::endl;
+        close(sockfd);
+        return;
     }
-};
 
-// Declare the app class before using wxIMPLEMENT_APP
-class MyApp : public wxApp {
-public:
-    virtual bool OnInit() {
-        MyFrame* frame = new MyFrame();
-        frame->Show(true);
-        return true;
-    }
-};
+    buffer[n] = '\0';
+    std::cout << "Received: " << buffer << std::endl;
+    close(sockfd);
+}
 
-wxIMPLEMENT_APP(MyApp);
+int main()
+{
+    PLATFORM_INIT();
+
+    // Set the IP address of the network interface (Linux specific)
+    SetIPAddress("enx94103eb7e201", "10.0.0.200");  // Set IP on 'enx94103eb7e201'
+
+    // Send UDP packet to device at 10.0.0.128
+    SendUDPPacket("10.0.0.128", 12345);
+
+    //// Optionally, receive a UDP packet
+    //ReceiveUDPPacket(12345);
+
+    PLATFORM_CLEANUP();
+
+    return 0;
+}
 
 
