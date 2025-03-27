@@ -9,6 +9,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 
+
 class MyFrame : public wxFrame {
 public:
     MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(800, 700)) {
@@ -87,6 +88,15 @@ public:
 
         panel->SetSizer(sizer);
         LoadNetworkInterfaces();
+
+        // network settings
+        std::string network_interface = "enx94103eb7e201";
+        std::string pc_ip     = "16.0.0.200";  
+        std::string device_ip = "16.0.0.128"; 
+        int port = 1234;
+
+        // Set IP address on network interface 
+        SetIPAddress(network_interface, pc_ip);
 
         // Bind events
         browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
@@ -189,6 +199,27 @@ private:
         }
         freeifaddrs(ifaddr);
     }
+
+
+    void SetIPAddress(const std::string& interface, const std::string& ipAddress) {
+        std::string command;
+        #ifdef __linux__
+            command = "sudo ifconfig " + interface + " " + ipAddress;
+        #elif _WIN32
+            command = "netsh interface ip set address name=\"" + interface + "\" static " + ipAddress + " 255.255.255.0";
+        #else
+            std::cerr << "Unsupported platform" << std::endl;
+            return;
+        #endif
+        if (system(command.c_str()) != 0) {
+            std::cerr << "Error setting IP address" << std::endl;
+            exit(1);
+        } else {
+            std::cerr << "interface = " << interface << ", IP address = " << ipAddress << std::endl;
+        }
+    }
+
+
 };
 
 // Declare the app class before using wxIMPLEMENT_APP
