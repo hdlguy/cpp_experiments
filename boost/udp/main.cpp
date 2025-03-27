@@ -7,26 +7,8 @@
 
 using boost::asio::ip::udp;
 
-void SetIPAddress(const std::string& interface, const std::string& ipAddress)
-{
-    std::string command;
-    
-    #ifdef __linux__
-        command = "sudo ifconfig " + interface + " " + ipAddress;
-    #elif _WIN32
-        command = "netsh interface ip set address name=\"" + interface + "\" static " + ipAddress + " 255.255.255.0";
-    #else
-        std::cerr << "Unsupported platform" << std::endl;
-        return;
-    #endif
+void SetIPAddress(const std::string& interface, const std::string& ipAddress);
 
-    if (system(command.c_str()) != 0) {
-        std::cerr << "Error setting IP address" << std::endl;
-        exit(1);
-    } else {
-        std::cerr << "interface = " << interface << ", IP address = " << ipAddress << std::endl;
-    }
-}
 
 int main()
 {
@@ -74,3 +56,20 @@ int main()
 }
 
 
+void SetIPAddress(const std::string& interface, const std::string& ipAddress) {
+    std::string command;
+    #ifdef __linux__
+        command = "sudo ifconfig " + interface + " " + ipAddress;
+    #elif _WIN32
+        command = "netsh interface ip set address name=\"" + interface + "\" static " + ipAddress + " 255.255.255.0";
+    #else
+        std::cerr << "Unsupported platform" << std::endl;
+        return;
+    #endif
+    if (system(command.c_str()) != 0) {
+        std::cerr << "Error setting IP address" << std::endl;
+        exit(1);
+    } else {
+        std::cerr << "interface = " << interface << ", IP address = " << ipAddress << std::endl;
+    }
+}
