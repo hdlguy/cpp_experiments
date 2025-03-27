@@ -9,10 +9,27 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 
+#include <boost/asio.hpp>
+#include <iostream>
+#include <stdio.h>
+
+#define     UDP_STAT_CON        9
+#define     UDP_STAT_REQ        10
+
+#define     BUF_LEN             2048
+
+using boost::asio::ip::udp;
 
 class MyFrame : public wxFrame {
 public:
     MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(800, 700)) {
+
+        // network settings
+        network_interface = "enx94103eb7e201";
+        pc_ip     = "16.0.0.200";  
+        device_ip = "16.0.0.128"; 
+        port = 1234;
+
         wxPanel* panel = new wxPanel(this);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -89,15 +106,6 @@ public:
         panel->SetSizer(sizer);
         LoadNetworkInterfaces();
 
-        // network settings
-        std::string network_interface = "enx94103eb7e201";
-        std::string pc_ip     = "16.0.0.200";  
-        std::string device_ip = "16.0.0.128"; 
-        int port = 1234;
-
-        // Set IP address on network interface 
-        SetIPAddress(network_interface, pc_ip);
-
         // Bind events
         browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
         fetchDeviceInfoButton->Bind(wxEVT_BUTTON, &MyFrame::OnFetchDeviceInfo, this);
@@ -116,6 +124,11 @@ private:
     wxCheckBox* rebootCheckBox;
     wxButton* startButton;
 
+    std::string network_interface;
+    std::string pc_ip;
+    std::string device_ip;
+    int port;
+
     // Progress bars for each operation
     wxGauge* eraseProgress;
     wxGauge* blankProgress;
@@ -131,9 +144,44 @@ private:
     }
 
     void OnFetchDeviceInfo(wxCommandEvent&) {
+        // Set IP address on network interface 
+        SetIPAddress(network_interface, pc_ip);
+
+        // setup tx socket
+        boost::asio::io_service tx_io_service;
+        udp::socket tx_socket(tx_io_service);
+        udp::endpoint device_endpoint(boost::asio::ip::address::from_string(device_ip), port);
+        tx_socket.open(udp::v4());
+
+        // setup rx socket
+        boost::asio::io_service rx_io_service;
+        udp::socket rx_socket(rx_io_service, udp::endpoint(udp::v4(), port));
+        std::cout << "UDP server listening on port " << port << "..." << std::endl;
+
+        // send status request packet
+        char txbuf[BUF_LEN];
+        txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
+        tx_socket.send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
+
+        // receive packets
+        char rxbuf[BUF_LEN];
+        uint32_t* rxregbuf = (uint32_t *)rxbuf;
+        udp::endpoint remote_endpoint;
+        uint8_t fpga_source;
+        do {
+            size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+            fpga_source = rxbuf[3];
+        } while (fpga_source != UDP_STAT_CON);
+
+        // print received values
+        uint32_t fpga_id, fpga_version;
+        fpga_version = rxregbuf[1]; fpga_id = rxregbuf[2]; 
+        printf("fpga_source = 0x%02x, fpga_id = 0x%08x, fpga_version = 0x%08x", fpga_source, fpga_id, fpga_version);
+        std::cout << " from " << remote_endpoint << std::endl;
+
         // Example code to set values
-        deviceIDText->SetValue("12345");
-        deviceVersionText->SetValue("1.0.0");
+        deviceIDText->SetValue(wxString::Format(wxT("0x%08x"),fpga_id));
+        deviceVersionText->SetValue(wxString::Format(wxT("0x%08x"),fpga_version));
     }
 
     void OnStart(wxCommandEvent&) {
