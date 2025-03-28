@@ -1,3 +1,7 @@
+// This is an example application demonstrating the use of wxWidgets for GUI generation and
+// the Boost library for UDP sockets communication.
+// Almost all the code in this project was created by ChatGPT.
+//
 #include <wx/wx.h>
 #include <wx/filedlg.h>
 #include <wx/choice.h>
@@ -227,18 +231,18 @@ private:
         writeProgress->SetValue(0);
         verifyProgress->SetValue(0);
         rebootProgress->SetValue(0);
+        wxYield();
 
         if (eraseCheckBox->IsChecked()) {
 
             // ************ Erase Sectors
             printf("ERASE\n");
-            for (int sector=0; sector<(RegionSize/SectorSize); sector++){
+            for (int i=0; i<(RegionSize/SectorSize); i++){
 
                 // send erase command
-                char txbuf[BUF_LEN];
                 ssize_t nBytes=8;
                 txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
-                uint32_t flash_address = RegionStart + SectorSize*sector;
+                uint32_t flash_address = RegionStart + SectorSize*i;
                 uint8_t flash_op = FLASH_OP_ERASE;
                 ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
                 tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
@@ -250,64 +254,90 @@ private:
                     fpga_source = rxbuf[3];
                 } while (fpga_source != UDP_FLASH);
 
-                eraseProgress->SetValue((int)100*((float)sector/(float)(RegionSize/SectorSize)));
-                std::cout << sector << "\n";
+                eraseProgress->SetValue((int)100*((float)i/(float)(RegionSize/SectorSize)));
+                wxYield();
 
             }
 
         }
+
+        // **********  Blank Check
+        if (blankCheckBox->IsChecked()) {
+
+            printf("BLANK_CHECK\n");
+            int errors = 0;
+            uint32_t flash_address;
+            for (int i=0; i<(RegionSize/OneKB); i++) {
+
+                // send read command
+                ssize_t nBytes=8;
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
+                flash_address = RegionStart + OneKB*i;
+                uint8_t flash_op = FLASH_OP_READ;
+                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
+
+                // receive data response packet
+                uint8_t fpga_source;
+                size_t length;
+                do {
+                    length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+                    fpga_source = rxbuf[3];
+                } while (fpga_source != UDP_FLASH);
+
+                // check the data
+                //for (int i=8; i<length; i++) {
+                for (int i=8; i<8; i++) {
+                    if (rxbuf[i] != 0xff) { 
+                        errors++; 
+                        //printf("%d %02x", i, rxbuf[i]);
+                    }
+                }
+                //printf("\n");
+
+                blankProgress->SetValue((int)100*((float)i/(float)(RegionSize/OneKB)));
+                wxYield();
+
+            }
+
+            printf("BLANK_CHECK: address = 0x%08x, errors = %d\n", flash_address, errors);
+
+        }
+
 /*
-    // ************ Erase Sectors
-    printf("ERASE\n");
-    for (int sector=0; sector<(RegionSize/SectorSize); sector++){
+    // *********** blank check the flash from 0x400000 to 0x7effff, 1KB at a time.
+    printf("BLANK_CHECK\n");
+    errors = 0;
+    for (int i=0; i<(RegionSize/OneKB); i++) {
+
 
         nBytes = 8;
-        flash_address = RegionStart + SectorSize*sector;
-        flash_op = FLASH_OP_ERASE;
+        flash_address = RegionStart + OneKB*i;
+        flash_op = FLASH_OP_READ;
 
+        // send READ packet
         ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
         sendto(clientSocket, txbuf, nBytes, 0, (struct sockaddr *)&serverAddr, addr_size); 
 
-        //usleep(1000);
-
+        // receive READ response packet
         //rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
         do {
             rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
             fpga_source   = rxbuf[3];
         } while (fpga_source != UDP_FLASH);
-        //if(rxlength<0) { printf("error in reading recvfrom function\n"); } 
+        //if(rxlength<0) { printf("error in reading recvfrom function\n"); }
 
-        printf("ERASE: address = 0x%08x\r", flash_address);
+        for (int i=8; i<rxlength; i++) {
+            if (rxbuf[i] != 0xff) { errors++; }
+        }
+
+        printf("BLANK_CHECK: address = 0x%08x, errors = %d\r", flash_address, errors);
 
     }
-    printf("ERASE: address = 0x%08x\n", flash_address);
-*/
-
-/*
-    // send packet
-    char txbuf[BUF_LEN];
-    txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
-    tx_socket.send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
-
-    // receive packets
-    char rxbuf[BUF_LEN];
-    uint32_t* rxregbuf = (uint32_t *)rxbuf;
-    udp::endpoint remote_endpoint;
-    uint8_t fpga_source;
-    do {
-        size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
-        fpga_source = rxbuf[3];
-    } while (fpga_source != UDP_STAT_CON);
+    printf("BLANK_CHECK: address = 0x%08x, errors = %d\n", flash_address, errors);
 
 */
 
-        if (blankCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Blank Check
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                blankProgress->SetValue(i);
-            }
-        }
         if (writeCheckBox->IsChecked()) {
             // Simulate a long-running operation for Write
             for (int i = 0; i <= 100; i++) {
@@ -315,6 +345,7 @@ private:
                 writeProgress->SetValue(i);
             }
         }
+
         if (verifyCheckBox->IsChecked()) {
             // Simulate a long-running operation for Verify
             for (int i = 0; i <= 100; i++) {
@@ -322,6 +353,7 @@ private:
                 verifyProgress->SetValue(i);
             }
         }
+
         if (rebootCheckBox->IsChecked()) {
             // Simulate a long-running operation for Reboot
             for (int i = 0; i <= 100; i++) {
@@ -329,6 +361,7 @@ private:
                 rebootProgress->SetValue(i);
             }
         }
+
     }
 
     void LoadNetworkInterfaces() {
