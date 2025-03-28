@@ -53,8 +53,8 @@ public:
 
         // Device ID and Version fields with button
         wxBoxSizer* deviceSizer = new wxBoxSizer(wxHORIZONTAL);
-        wxButton* fetchDeviceInfoButton = new wxButton(panel, wxID_ANY, "Fetch Info");
-        wxStaticText* idLabel = new wxStaticText(panel, wxID_ANY, "Device ID:");
+        wxButton* fetchDeviceInfoButton = new wxButton(panel, wxID_ANY, "FPGA Info");
+        wxStaticText* idLabel = new wxStaticText(panel, wxID_ANY, "ID:");
         deviceIDText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
         wxStaticText* versionLabel = new wxStaticText(panel, wxID_ANY, "Version:");
         deviceVersionText = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxSize(100, -1), wxTE_READONLY);
@@ -135,6 +135,15 @@ private:
     wxGauge* writeProgress;
     wxGauge* verifyProgress;
     wxGauge* rebootProgress;
+
+
+    void OnInterfaceSelected(wxCommandEvent&) {
+        int selection = interfaceChoice->GetSelection();
+        if (selection != wxNOT_FOUND) {
+            network_interface = interfaceChoice->GetString(selection);
+            wxLogMessage("User selected interface: %s", network_interface);
+        }
+    }
 
     void OnBrowse(wxCommandEvent&) {
         wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
