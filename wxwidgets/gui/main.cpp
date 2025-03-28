@@ -13,11 +13,14 @@
 #include <iostream>
 #include <stdio.h>
 
-#define     UDP_STAT_CON        9
-#define     UDP_STAT_REQ        10
-
 #define     BUF_LEN             2048
 
+// some udp destination/source codes
+#define     UDP_STAT_CON        9
+#define     UDP_STAT_REQ        10
+#define     UDP_FLASH           11
+
+// flash operations
 #define FLASH_OP_WRITE  1
 #define FLASH_OP_READ   2
 #define FLASH_OP_ERASE  3
@@ -136,8 +139,12 @@ private:
     boost::asio::io_service tx_io_service;
     boost::asio::io_service rx_io_service;
     udp::endpoint device_endpoint;
+    udp::endpoint remote_endpoint;
     udp::socket* tx_socket;
     udp::socket* rx_socket;
+
+    char txbuf[BUF_LEN];
+    char rxbuf[BUF_LEN];
 
     std::string network_interface;
     std::string pc_ip;
@@ -190,17 +197,14 @@ private:
         std::cout << "UDP server listening on port " << port << "..." << std::endl;
 
         // send status request packet
-        char txbuf[BUF_LEN];
         txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
         tx_socket->send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
 
         // receive packets
-        char rxbuf[BUF_LEN];
         uint32_t* rxregbuf = (uint32_t *)rxbuf;
-        udp::endpoint remote_endpoint;
         uint8_t fpga_source;
         do {
-            size_t length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+            size_t length = rx_socket->receive_from(boost::asio::buffer(rxbuf), device_endpoint);
             fpga_source = rxbuf[3];
         } while (fpga_source != UDP_STAT_CON);
 
@@ -225,6 +229,7 @@ private:
         rebootProgress->SetValue(0);
 
         if (eraseCheckBox->IsChecked()) {
+
             // ************ Erase Sectors
             printf("ERASE\n");
             for (int sector=0; sector<(RegionSize/SectorSize); sector++){
@@ -232,19 +237,24 @@ private:
                 // send erase command
                 char txbuf[BUF_LEN];
                 ssize_t nBytes=8;
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 uint32_t flash_address = RegionStart + SectorSize*sector;
                 uint8_t flash_op = FLASH_OP_ERASE;
                 ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-//                tx_socket.send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
+                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
 
-//                // receive response packet
-//                uint8_t fpga_source;
-//                do {
-//                    size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
-//                    fpga_source = rxbuf[3];
-//                } while (fpga_source != UDP_STAT_CON);
+                // receive response packet
+                uint8_t fpga_source;
+                do {
+                    size_t length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+                    fpga_source = rxbuf[3];
+                } while (fpga_source != UDP_FLASH);
+
+                eraseProgress->SetValue((int)100*((float)sector/(float)(RegionSize/SectorSize)));
+                std::cout << sector << "\n";
 
             }
+
         }
 /*
     // ************ Erase Sectors
