@@ -18,6 +18,12 @@
 
 #define     BUF_LEN             2048
 
+#define FLASH_OP_WRITE  1
+#define FLASH_OP_READ   2
+#define FLASH_OP_ERASE  3
+#define FLASH_OP_ECHO   4
+#define FLASH_OP_REBOOT 5
+
 using boost::asio::ip::udp;
 
 class MyFrame : public wxFrame {
@@ -29,6 +35,9 @@ public:
         pc_ip     = "16.0.0.200";  
         device_ip = "16.0.0.128"; 
         port = 1234;
+
+        tx_socket = nullptr;
+        rx_socket = nullptr;
 
         wxPanel* panel = new wxPanel(this);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
@@ -124,10 +133,20 @@ private:
     wxCheckBox* rebootCheckBox;
     wxButton* startButton;
 
+    boost::asio::io_service tx_io_service;
+    boost::asio::io_service rx_io_service;
+    udp::endpoint device_endpoint;
+    udp::socket* tx_socket;
+    udp::socket* rx_socket;
+
     std::string network_interface;
     std::string pc_ip;
     std::string device_ip;
     int port;
+    const int OneKB = 1024;
+    const int SectorSize = 64*OneKB;
+    const int RegionStart = 0x00400000;
+    const int RegionSize = 0x3F0000;
 
     // Progress bars for each operation
     wxGauge* eraseProgress;
@@ -153,24 +172,27 @@ private:
     }
 
     void OnFetchDeviceInfo(wxCommandEvent&) {
+
         // Set IP address on network interface 
         SetIPAddress(network_interface, pc_ip);
 
         // setup tx socket
-        boost::asio::io_service tx_io_service;
-        udp::socket tx_socket(tx_io_service);
-        udp::endpoint device_endpoint(boost::asio::ip::address::from_string(device_ip), port);
-        tx_socket.open(udp::v4());
+        device_endpoint = udp::endpoint(boost::asio::ip::address::from_string(device_ip), port);
+        if (!tx_socket) {
+            tx_socket = new udp::socket(tx_io_service);
+            tx_socket->open(udp::v4());
+        }
 
         // setup rx socket
-        boost::asio::io_service rx_io_service;
-        udp::socket rx_socket(rx_io_service, udp::endpoint(udp::v4(), port));
+        if (!rx_socket) {
+            rx_socket = new udp::socket(rx_io_service, udp::endpoint(udp::v4(), port));
+        }
         std::cout << "UDP server listening on port " << port << "..." << std::endl;
 
         // send status request packet
         char txbuf[BUF_LEN];
         txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
-        tx_socket.send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
+        tx_socket->send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
 
         // receive packets
         char rxbuf[BUF_LEN];
@@ -178,7 +200,7 @@ private:
         udp::endpoint remote_endpoint;
         uint8_t fpga_source;
         do {
-            size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+            size_t length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
             fpga_source = rxbuf[3];
         } while (fpga_source != UDP_STAT_CON);
 
@@ -191,6 +213,7 @@ private:
         // Example code to set values
         deviceIDText->SetValue(wxString::Format(wxT("0x%08x"),fpga_id));
         deviceVersionText->SetValue(wxString::Format(wxT("0x%08x"),fpga_version));
+
     }
 
     void OnStart(wxCommandEvent&) {
@@ -202,12 +225,72 @@ private:
         rebootProgress->SetValue(0);
 
         if (eraseCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Erase
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                eraseProgress->SetValue(i);
+            // ************ Erase Sectors
+            printf("ERASE\n");
+            for (int sector=0; sector<(RegionSize/SectorSize); sector++){
+
+                // send erase command
+                char txbuf[BUF_LEN];
+                ssize_t nBytes=8;
+                uint32_t flash_address = RegionStart + SectorSize*sector;
+                uint8_t flash_op = FLASH_OP_ERASE;
+                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+//                tx_socket.send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
+
+//                // receive response packet
+//                uint8_t fpga_source;
+//                do {
+//                    size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+//                    fpga_source = rxbuf[3];
+//                } while (fpga_source != UDP_STAT_CON);
+
             }
         }
+/*
+    // ************ Erase Sectors
+    printf("ERASE\n");
+    for (int sector=0; sector<(RegionSize/SectorSize); sector++){
+
+        nBytes = 8;
+        flash_address = RegionStart + SectorSize*sector;
+        flash_op = FLASH_OP_ERASE;
+
+        ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+        sendto(clientSocket, txbuf, nBytes, 0, (struct sockaddr *)&serverAddr, addr_size); 
+
+        //usleep(1000);
+
+        //rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
+        do {
+            rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
+            fpga_source   = rxbuf[3];
+        } while (fpga_source != UDP_FLASH);
+        //if(rxlength<0) { printf("error in reading recvfrom function\n"); } 
+
+        printf("ERASE: address = 0x%08x\r", flash_address);
+
+    }
+    printf("ERASE: address = 0x%08x\n", flash_address);
+*/
+
+/*
+    // send packet
+    char txbuf[BUF_LEN];
+    txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
+    tx_socket.send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
+
+    // receive packets
+    char rxbuf[BUF_LEN];
+    uint32_t* rxregbuf = (uint32_t *)rxbuf;
+    udp::endpoint remote_endpoint;
+    uint8_t fpga_source;
+    do {
+        size_t length = rx_socket.receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+        fpga_source = rxbuf[3];
+    } while (fpga_source != UDP_STAT_CON);
+
+*/
+
         if (blankCheckBox->IsChecked()) {
             // Simulate a long-running operation for Blank Check
             for (int i = 0; i <= 100; i++) {
