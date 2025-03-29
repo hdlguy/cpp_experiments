@@ -201,8 +201,10 @@ private:
         std::cout << "UDP server listening on port " << port << "..." << std::endl;
 
         // send status request packet
-        txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_REQ;
-        tx_socket->send_to(boost::asio::buffer(std::string(txbuf,4)), device_endpoint);
+        txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_CON; //UDP_STAT_REQ;
+        ssize_t nBytes=132;
+        for (int i=4; i<nBytes; i++) txbuf[i] = 0x00;  // these zeros disable normal operation.
+        tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
 
         // receive packets
         uint32_t* rxregbuf = (uint32_t *)rxbuf;
