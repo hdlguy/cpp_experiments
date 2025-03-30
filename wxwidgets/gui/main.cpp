@@ -288,58 +288,26 @@ private:
                     fpga_source = rxbuf[3];
                 } while (fpga_source != UDP_FLASH);
 
+                //if ((i<10)) { printf("%lu: ", length); for (int j=0; j<32; j++) { printf("%02x ", (uint8_t)rxbuf[j]); } printf("\n"); }
+
                 // check the data
-                //for (int i=8; i<length; i++) {
-                for (int i=8; i<8; i++) {
-                    if (rxbuf[i] != 0xff) { 
+                for (int i=8; i<length; i++) {
+                    if ((uint8_t)rxbuf[i] != 0xff) { 
                         errors++; 
-                        //printf("%d %02x", i, rxbuf[i]);
                     }
                 }
-                //printf("\n");
 
                 blankProgress->SetValue((int)100*((float)i/(float)(RegionSize/OneKB)));
                 wxYield();
 
+                printf("BLANK_CHECK: address = 0x%08x, errors = 0x%08x\r", flash_address, errors);
+
             }
 
-            printf("BLANK_CHECK: address = 0x%08x, errors = %d\n", flash_address, errors);
+            printf("BLANK_CHECK: address = 0x%08x, errors = 0x%08x\n", flash_address, errors);
 
         }
 
-/*
-    // *********** blank check the flash from 0x400000 to 0x7effff, 1KB at a time.
-    printf("BLANK_CHECK\n");
-    errors = 0;
-    for (int i=0; i<(RegionSize/OneKB); i++) {
-
-
-        nBytes = 8;
-        flash_address = RegionStart + OneKB*i;
-        flash_op = FLASH_OP_READ;
-
-        // send READ packet
-        ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-        sendto(clientSocket, txbuf, nBytes, 0, (struct sockaddr *)&serverAddr, addr_size); 
-
-        // receive READ response packet
-        //rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
-        do {
-            rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
-            fpga_source   = rxbuf[3];
-        } while (fpga_source != UDP_FLASH);
-        //if(rxlength<0) { printf("error in reading recvfrom function\n"); }
-
-        for (int i=8; i<rxlength; i++) {
-            if (rxbuf[i] != 0xff) { errors++; }
-        }
-
-        printf("BLANK_CHECK: address = 0x%08x, errors = %d\r", flash_address, errors);
-
-    }
-    printf("BLANK_CHECK: address = 0x%08x, errors = %d\n", flash_address, errors);
-
-*/
 
         if (writeCheckBox->IsChecked()) {
             // Simulate a long-running operation for Write
