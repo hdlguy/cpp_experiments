@@ -18,12 +18,14 @@
 #include <iostream>
 #include <stdio.h>
 
-#define     BUF_LEN             2048
+#define BUF_LEN         2048
+#define DATA_SIZE       1024
+#define BUF_SIZE        (DATA_SIZE+4+4)
 
 // some udp destination/source codes
-#define     UDP_STAT_CON        9
-#define     UDP_STAT_REQ        10
-#define     UDP_FLASH           11
+#define UDP_STAT_CON     9
+#define UDP_STAT_REQ     10
+#define UDP_FLASH        11
 
 // flash operations
 #define FLASH_OP_WRITE  1
@@ -162,6 +164,8 @@ private:
     const int RegionStart = 0x00400000;
     const int RegionSize = 0x3F0000;
     int stream_1KB;
+    size_t binsize;
+    uint8_t *binstream;
 
     // Progress bars for each operation
     wxGauge* eraseProgress;
@@ -220,8 +224,8 @@ private:
             } 
         
             // copy bitstream to binstream omitting header.
-            size_t binsize = bitsize - sync_loc + preamble_length;
-            uint8_t *binstream = (uint8_t *)malloc(binsize);
+            binsize = bitsize - sync_loc + preamble_length;
+            binstream = (uint8_t *)malloc(binsize);
             for (int i=0; i<binsize; i++) {
                 binstream[i] = bitstream[i+sync_loc-preamble_length];
             }
@@ -320,13 +324,15 @@ private:
             printf("BLANK_CHECK\n");
             int errors = 0;
             uint32_t flash_address;
+            ssize_t nBytes;
+            uint8_t flash_op;
             for (int i=0; i<(RegionSize/OneKB); i++) {
 
                 // send read command
-                ssize_t nBytes=8;
+                nBytes=8;
                 txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 flash_address = RegionStart + OneKB*i;
-                uint8_t flash_op = FLASH_OP_READ;
+                flash_op = FLASH_OP_READ;
                 ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
                 tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
 
@@ -360,50 +366,48 @@ private:
 
         // **** Write Flash
         if (writeCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Write
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                writeProgress->SetValue(i);
+
+            printf("WRITE\n");
+            uint32_t flash_address;
+            ssize_t nBytes;
+            uint8_t flash_op;
+            for (int i=0; i<stream_1KB; i++) {
+                nBytes = BUF_SIZE;
+                flash_address = RegionStart + OneKB*i;
+                flash_op = FLASH_OP_WRITE;
+
+                // fill the the tx buffer
+                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+                for (int j=0; j<OneKB; j++) {
+                    if ((OneKB*i+j) < binsize){
+                        txbuf[j+4+4] = binstream[j+OneKB*i];
+                    } else {
+                        txbuf[j+4+4] = 0xff;
+                    }
+                }
+
+                // send WRITE packet
+                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
+
+                // receive data response packet
+                uint8_t fpga_source;
+                size_t length;
+                do {
+                    length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+                    fpga_source = rxbuf[3];
+                } while (fpga_source != UDP_FLASH);
+
+                writeProgress->SetValue((int)100*((float)i/(float)(stream_1KB)));
                 wxYield();
+
+                printf("WRITE: address = 0x%08x\r", flash_address);
+
             }
+            printf("WRITE: address = 0x%08x\n", flash_address);
+
         }
 /*
-    // *********** write the configuration data to flash
-    printf("WRITE\n");
-    for (int i=0; i<stream_1KB; i++) {
-
-        nBytes = BUF_SIZE;
-        flash_address = RegionStart + OneKB*i;
-        flash_op = FLASH_OP_WRITE;
-
-        // fill the the tx buffer
-        ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-        for (int j=0; j<OneKB; j++) {
-            if ((OneKB*i+j) < binsize){
-                txbuf[j+4+4] = binstream[j+OneKB*i];
-            } else {
-                txbuf[j+4+4] = 0xff;
-            }
-        }
-
-        // send WRITE packet
-        ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-        sendto(clientSocket, txbuf, nBytes, 0, (struct sockaddr *)&serverAddr, addr_size); 
-
-        //usleep(1000);
-
-        // receive WRITE response packet
-        //rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
-        do {
-            rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
-            fpga_source   = rxbuf[3];
-        } while (fpga_source != UDP_FLASH);
-        //if(rxlength<0) { printf("error in reading recvfrom function\n"); }
-
-        printf("WRITE: address = 0x%08x\r", flash_address);
-
-    }
-    printf("WRITE: address = 0x%08x\n", flash_address);
 */
 
         // **** Verify Flash
