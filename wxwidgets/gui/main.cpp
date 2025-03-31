@@ -344,8 +344,6 @@ private:
                     fpga_source = rxbuf[3];
                 } while (fpga_source != UDP_FLASH);
 
-                //if ((i<10)) { printf("%lu: ", length); for (int j=0; j<32; j++) { printf("%02x ", (uint8_t)rxbuf[j]); } printf("\n"); }
-
                 // check the data
                 for (int i=8; i<length; i++) {
                     if ((uint8_t)rxbuf[i] != 0xff) { 
@@ -408,17 +406,54 @@ private:
             printf("WRITE: address = 0x%08x\n", flash_address);
 
         }
-/*
-*/
 
         // **** Verify Flash
         if (verifyCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Verify
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                verifyProgress->SetValue(i);
+
+            printf("VERIFY\n");
+            int errors = 0;
+            uint8_t compare_buf[OneKB];
+            uint32_t flash_address;
+            ssize_t nBytes;
+            uint8_t flash_op;
+            ssize_t rxlength;
+            for (int i=0; i<stream_1KB; i++) {
+
+                // send read command
+                nBytes=8;
+                flash_address = RegionStart + OneKB*i;
+                flash_op = FLASH_OP_READ;
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
+                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
+
+                // receive data response packet
+                uint8_t fpga_source;
+                size_t length;
+                do {
+                    length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
+                    fpga_source = rxbuf[3];
+                } while (fpga_source != UDP_FLASH);
+
+                // verify data
+                for (int j=0; j<OneKB; j++) {
+                    if ((OneKB*i+j) < binsize){
+                        compare_buf[j] = binstream[j+OneKB*i];
+                    } else {
+                        compare_buf[j] = 0xff;
+                    }
+                }
+                for (int i=8; i<length; i++) {
+                    if (rxbuf[i] != compare_buf[i-8]) { errors++; }
+                }
+
+                verifyProgress->SetValue((int)100*((float)i/(float)(stream_1KB)));
                 wxYield();
+
+                printf("VERIFY: address = 0x%08x, errors = %d\r", flash_address, errors);
             }
+            printf("VERIFY: address = 0x%08x, errors = %d\n", flash_address, errors);
+
         }
 
 
@@ -446,6 +481,7 @@ private:
 
 
     }
+
 
     void LoadNetworkInterfaces() {
         struct ifaddrs* ifaddr;
