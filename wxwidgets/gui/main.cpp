@@ -298,9 +298,9 @@ private:
 
                 // send erase command
                 ssize_t nBytes=8;
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 uint32_t flash_address = RegionStart + SectorSize*i;
                 uint8_t flash_op = FLASH_OP_ERASE;
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
                 tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
 
@@ -330,9 +330,9 @@ private:
 
                 // send read command
                 nBytes=8;
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 flash_address = RegionStart + OneKB*i;
                 flash_op = FLASH_OP_READ;
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
                 tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
 
@@ -387,6 +387,7 @@ private:
                 }
 
                 // send WRITE packet
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
                 ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
                 tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
 
@@ -420,15 +421,29 @@ private:
             }
         }
 
+
         // *** Reboot FPGA
         if (rebootCheckBox->IsChecked()) {
-            // Simulate a long-running operation for Reboot
-            for (int i = 0; i <= 100; i++) {
-                wxMilliSleep(5);  // Faster progress (5 ms delay)
-                rebootProgress->SetValue(i);
-                wxYield();
+
+            uint32_t flash_address;
+            ssize_t nBytes;
+            uint8_t flash_op;
+
+            {
+                nBytes = 16;
+                flash_address = RegionStart;
+                flash_op = FLASH_OP_REBOOT;
+                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
+                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
             }
+
+            printf("REBOOT\n");
+
+            rebootProgress->SetValue(100);
+            wxYield();
         }
+
 
     }
 
