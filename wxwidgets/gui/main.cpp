@@ -36,6 +36,8 @@ using boost::asio::ip::udp;
 
 class MyFrame : public wxFrame {
 public:
+
+    // constructor for MyFrame
     MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(800, 700)) {
 
         // network settings
@@ -159,6 +161,7 @@ private:
     const int SectorSize = 64*OneKB;
     const int RegionStart = 0x00400000;
     const int RegionSize = 0x3F0000;
+    int stream_1KB;
 
     // Progress bars for each operation
     wxGauge* eraseProgress;
@@ -177,11 +180,58 @@ private:
     }
 
     void OnBrowse(wxCommandEvent&) {
+
+        const uint32_t sync_pat = 0xAA995566;
+        const int preamble_length = 48;
+
         wxFileDialog openFileDialog(this, "Choose a file", "", "", "Bitstream and Binary files (*.bit;*.bin)|*.bit;*.bin", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (openFileDialog.ShowModal() == wxID_OK) {
+
+            // get filename
             fileTextCtrl->SetValue(openFileDialog.GetPath());
+            wxString infile = openFileDialog.GetPath();
+            std::cout << "infile = " << infile << "\n";
+
+            // read bit file
+            struct stat file_info;
+            stat(infile, &file_info);
+            size_t bitsize = file_info.st_size;
+            uint8_t *bitstream = (uint8_t *)malloc(bitsize);
+            FILE *fp;
+            fp = fopen(infile, "rb");
+            fread(bitstream, bitsize, 1, fp);
+            fclose(fp);
+            std::cout << "bitsize = " << bitsize << "\n";
+
+            // find the sync pattern
+            uint32_t search_pat;
+            int sync_loc=-1;
+            for (int i=0; i<bitsize-4; i++) {
+                search_pat = (bitstream[i+0]<<24) | (bitstream[i+1]<<16) | (bitstream[i+2]<< 8) | (bitstream[i+3]<< 0);
+                if (search_pat == sync_pat) {
+                    sync_loc = i;
+                }
+            }
+            printf("sync location = %d\n", sync_loc);
+        
+            // check for validity
+            if (sync_loc<preamble_length) {
+                std::cout << "sync pattern not found in " << infile << "\n";
+            } 
+        
+            // copy bitstream to binstream omitting header.
+            size_t binsize = bitsize - sync_loc + preamble_length;
+            uint8_t *binstream = (uint8_t *)malloc(binsize);
+            for (int i=0; i<binsize; i++) {
+                binstream[i] = bitstream[i+sync_loc-preamble_length];
+            }
+    
+            stream_1KB = (int)(ceil((double)binsize/(double)OneKB));
+
         }
+
     }
+
 
     void OnFetchDeviceInfo(wxCommandEvent&) {
 
@@ -308,28 +358,71 @@ private:
 
         }
 
-
+        // **** Write Flash
         if (writeCheckBox->IsChecked()) {
             // Simulate a long-running operation for Write
             for (int i = 0; i <= 100; i++) {
                 wxMilliSleep(5);  // Faster progress (5 ms delay)
                 writeProgress->SetValue(i);
+                wxYield();
+            }
+        }
+/*
+    // *********** write the configuration data to flash
+    printf("WRITE\n");
+    for (int i=0; i<stream_1KB; i++) {
+
+        nBytes = BUF_SIZE;
+        flash_address = RegionStart + OneKB*i;
+        flash_op = FLASH_OP_WRITE;
+
+        // fill the the tx buffer
+        ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+        for (int j=0; j<OneKB; j++) {
+            if ((OneKB*i+j) < binsize){
+                txbuf[j+4+4] = binstream[j+OneKB*i];
+            } else {
+                txbuf[j+4+4] = 0xff;
             }
         }
 
+        // send WRITE packet
+        ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
+        sendto(clientSocket, txbuf, nBytes, 0, (struct sockaddr *)&serverAddr, addr_size); 
+
+        //usleep(1000);
+
+        // receive WRITE response packet
+        //rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
+        do {
+            rxlength = recvfrom(sockfd, (char *)rxbuf, MAXLINE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
+            fpga_source   = rxbuf[3];
+        } while (fpga_source != UDP_FLASH);
+        //if(rxlength<0) { printf("error in reading recvfrom function\n"); }
+
+        printf("WRITE: address = 0x%08x\r", flash_address);
+
+    }
+    printf("WRITE: address = 0x%08x\n", flash_address);
+*/
+
+        // **** Verify Flash
         if (verifyCheckBox->IsChecked()) {
             // Simulate a long-running operation for Verify
             for (int i = 0; i <= 100; i++) {
                 wxMilliSleep(5);  // Faster progress (5 ms delay)
                 verifyProgress->SetValue(i);
+                wxYield();
             }
         }
 
+        // *** Reboot FPGA
         if (rebootCheckBox->IsChecked()) {
             // Simulate a long-running operation for Reboot
             for (int i = 0; i <= 100; i++) {
                 wxMilliSleep(5);  // Faster progress (5 ms delay)
                 rebootProgress->SetValue(i);
+                wxYield();
             }
         }
 
