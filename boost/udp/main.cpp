@@ -21,7 +21,7 @@ int main()
     int port = 1234;
 
     // Set IP address on network interface 
-    SetIPAddress(network_interface, pc_ip);
+    //SetIPAddress(network_interface, pc_ip);
 
     // setup tx socket
     boost::asio::io_service tx_io_service;
