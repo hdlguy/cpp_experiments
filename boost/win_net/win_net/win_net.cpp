@@ -10,7 +10,7 @@ void PrintNetworkInterfaces() {
     PIP_ADAPTER_ADDRESSES adapterAddresses = (PIP_ADAPTER_ADDRESSES)malloc(bufferSize);
     if (GetAdaptersAddresses(AF_INET, 0, NULL, adapterAddresses, &bufferSize) == NO_ERROR) {
         for (PIP_ADAPTER_ADDRESSES adapter = adapterAddresses; adapter; adapter = adapter->Next) {
-            std::wcout << L"Interface Name: " << adapter->FriendlyName << ",  " << adapter->Description << std::endl;
+            std::wcout << adapter->FriendlyName << ",  " << adapter->Description << std::endl;
         }
     }
     free(adapterAddresses);
@@ -18,5 +18,8 @@ void PrintNetworkInterfaces() {
 
 int main() {
     PrintNetworkInterfaces();
+
+    std::getchar();
+
     return 0;
 }
