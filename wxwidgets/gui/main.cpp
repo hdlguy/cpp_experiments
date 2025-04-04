@@ -14,7 +14,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 
-#include <boost/asio.hpp>
+//#include <boost/asio.hpp>
 #include <iostream>
 #include <stdio.h>
 
@@ -34,22 +34,13 @@
 #define FLASH_OP_ECHO   4
 #define FLASH_OP_REBOOT 5
 
-using boost::asio::ip::udp;
+//using boost::asio::ip::udp;
 
 class MyFrame : public wxFrame {
 public:
 
     // constructor for MyFrame
     MyFrame() : wxFrame(nullptr, wxID_ANY, "wxWidgets GUI", wxDefaultPosition, wxSize(800, 700)) {
-
-        // network settings
-        network_interface = "enx94103eb7e201";
-        pc_ip     = "16.0.0.200";  
-        device_ip = "16.0.0.128"; 
-        port = 1234;
-
-        tx_socket = nullptr;
-        rx_socket = nullptr;
 
         wxPanel* panel = new wxPanel(this);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
@@ -125,7 +116,6 @@ public:
         sizer->Add(startButton, 0, wxALIGN_CENTER | wxALL, 10);
 
         panel->SetSizer(sizer);
-        LoadNetworkInterfaces();
 
         // Bind events
         browseButton->Bind(wxEVT_BUTTON, &MyFrame::OnBrowse, this);
@@ -145,43 +135,12 @@ private:
     wxCheckBox* rebootCheckBox;
     wxButton* startButton;
 
-    boost::asio::io_service tx_io_service;
-    boost::asio::io_service rx_io_service;
-    udp::endpoint device_endpoint;
-    udp::endpoint remote_endpoint;
-    udp::socket* tx_socket;
-    udp::socket* rx_socket;
-
-    char txbuf[BUF_LEN];
-    char rxbuf[BUF_LEN];
-
-    std::string network_interface;
-    std::string pc_ip;
-    std::string device_ip;
-    int port;
-    const int OneKB = 1024;
-    const int SectorSize = 64*OneKB;
-    const int RegionStart = 0x00400000;
-    const int RegionSize = 0x3F0000;
-    int stream_1KB;
-    size_t binsize;
-    uint8_t *binstream;
-
     // Progress bars for each operation
     wxGauge* eraseProgress;
     wxGauge* blankProgress;
     wxGauge* writeProgress;
     wxGauge* verifyProgress;
     wxGauge* rebootProgress;
-
-
-    void OnInterfaceSelected(wxCommandEvent&) {
-        int selection = interfaceChoice->GetSelection();
-        if (selection != wxNOT_FOUND) {
-            network_interface = interfaceChoice->GetString(selection);
-            wxLogMessage("User selected interface: %s", network_interface);
-        }
-    }
 
     void OnBrowse(wxCommandEvent&) {
 
@@ -194,43 +153,6 @@ private:
             // get filename
             fileTextCtrl->SetValue(openFileDialog.GetPath());
             wxString infile = openFileDialog.GetPath();
-            std::cout << "infile = " << infile << "\n";
-
-            // read bit file
-            struct stat file_info;
-            stat(infile, &file_info);
-            size_t bitsize = file_info.st_size;
-            uint8_t *bitstream = (uint8_t *)malloc(bitsize);
-            FILE *fp;
-            fp = fopen(infile, "rb");
-            fread(bitstream, bitsize, 1, fp);
-            fclose(fp);
-            std::cout << "bitsize = " << bitsize << "\n";
-
-            // find the sync pattern
-            uint32_t search_pat;
-            int sync_loc=-1;
-            for (int i=0; i<bitsize-4; i++) {
-                search_pat = (bitstream[i+0]<<24) | (bitstream[i+1]<<16) | (bitstream[i+2]<< 8) | (bitstream[i+3]<< 0);
-                if (search_pat == sync_pat) {
-                    sync_loc = i;
-                }
-            }
-            printf("sync location = %d\n", sync_loc);
-        
-            // check for validity
-            if (sync_loc<preamble_length) {
-                std::cout << "sync pattern not found in " << infile << "\n";
-            } 
-        
-            // copy bitstream to binstream omitting header.
-            binsize = bitsize - sync_loc + preamble_length;
-            binstream = (uint8_t *)malloc(binsize);
-            for (int i=0; i<binsize; i++) {
-                binstream[i] = bitstream[i+sync_loc-preamble_length];
-            }
-    
-            stream_1KB = (int)(ceil((double)binsize/(double)OneKB));
 
         }
 
@@ -239,43 +161,10 @@ private:
 
     void OnFetchDeviceInfo(wxCommandEvent&) {
 
-        // Set IP address on network interface 
-        SetIPAddress(network_interface, pc_ip);
-
-        // setup tx socket
-        device_endpoint = udp::endpoint(boost::asio::ip::address::from_string(device_ip), port);
-        if (!tx_socket) {
-            tx_socket = new udp::socket(tx_io_service);
-            tx_socket->open(udp::v4());
-        }
-
-        // setup rx socket
-        if (!rx_socket) {
-            rx_socket = new udp::socket(rx_io_service, udp::endpoint(udp::v4(), port));
-        }
-        std::cout << "UDP server listening on port " << port << "..." << std::endl;
-
-        // send status request packet
-        txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_STAT_CON; //UDP_STAT_REQ;
-        ssize_t nBytes=132;
-        for (int i=4; i<nBytes; i++) txbuf[i] = 0x00;  // these zeros disable normal operation.
-        tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
-
-        // receive packets
-        uint32_t* rxregbuf = (uint32_t *)rxbuf;
-        uint8_t fpga_source;
-        do {
-            size_t length = rx_socket->receive_from(boost::asio::buffer(rxbuf), device_endpoint);
-            fpga_source = rxbuf[3];
-        } while (fpga_source != UDP_STAT_CON);
-
-        // print received values
+        // print values
         uint32_t fpga_id, fpga_version;
-        fpga_version = rxregbuf[1]; fpga_id = rxregbuf[2]; 
-        printf("fpga_source = 0x%02x, fpga_id = 0x%08x, fpga_version = 0x%08x", fpga_source, fpga_id, fpga_version);
-        std::cout << " from " << remote_endpoint << std::endl;
-
-        // Example code to set values
+        fpga_version = 0x00001234;
+        fpga_id = 0xdeadbeef;
         deviceIDText->SetValue(wxString::Format(wxT("0x%08x"),fpga_id));
         deviceVersionText->SetValue(wxString::Format(wxT("0x%08x"),fpga_version));
 
@@ -294,25 +183,11 @@ private:
 
             // ************ Erase Sectors
             printf("ERASE\n");
-            for (int i=0; i<(RegionSize/SectorSize); i++){
+            for (int i=0; i<(100); i++){
 
-                // send erase command
-                ssize_t nBytes=8;
-                uint32_t flash_address = RegionStart + SectorSize*i;
-                uint8_t flash_op = FLASH_OP_ERASE;
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
-                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
-
-                // receive response packet
-                uint8_t fpga_source;
-                do {
-                    size_t length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
-                    fpga_source = rxbuf[3];
-                } while (fpga_source != UDP_FLASH);
-
-                eraseProgress->SetValue((int)100*((float)i/(float)(RegionSize/SectorSize)));
+                eraseProgress->SetValue(i);
                 wxYield();
+                usleep(5000);
 
             }
 
@@ -322,43 +197,13 @@ private:
         if (blankCheckBox->IsChecked()) {
 
             printf("BLANK_CHECK\n");
-            int errors = 0;
-            uint32_t flash_address;
-            ssize_t nBytes;
-            uint8_t flash_op;
-            for (int i=0; i<(RegionSize/OneKB); i++) {
+            for (int i=0; i<(100); i++) {
 
-                // send read command
-                nBytes=8;
-                flash_address = RegionStart + OneKB*i;
-                flash_op = FLASH_OP_READ;
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
-                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
-
-                // receive data response packet
-                uint8_t fpga_source;
-                size_t length;
-                do {
-                    length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
-                    fpga_source = rxbuf[3];
-                } while (fpga_source != UDP_FLASH);
-
-                // check the data
-                for (int i=8; i<length; i++) {
-                    if ((uint8_t)rxbuf[i] != 0xff) { 
-                        errors++; 
-                    }
-                }
-
-                blankProgress->SetValue((int)100*((float)i/(float)(RegionSize/OneKB)));
+                blankProgress->SetValue(i);
                 wxYield();
-
-                printf("BLANK_CHECK: address = 0x%08x, errors = 0x%08x\r", flash_address, errors);
+                usleep(5000);
 
             }
-
-            printf("BLANK_CHECK: address = 0x%08x, errors = 0x%08x\n", flash_address, errors);
 
         }
 
@@ -366,44 +211,13 @@ private:
         if (writeCheckBox->IsChecked()) {
 
             printf("WRITE\n");
-            uint32_t flash_address;
-            ssize_t nBytes;
-            uint8_t flash_op;
-            for (int i=0; i<stream_1KB; i++) {
-                nBytes = BUF_SIZE;
-                flash_address = RegionStart + OneKB*i;
-                flash_op = FLASH_OP_WRITE;
+            for (int i=0; i<100; i++) {
 
-                // fill the the tx buffer
-                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-                for (int j=0; j<OneKB; j++) {
-                    if ((OneKB*i+j) < binsize){
-                        txbuf[j+4+4] = binstream[j+OneKB*i];
-                    } else {
-                        txbuf[j+4+4] = 0xff;
-                    }
-                }
-
-                // send WRITE packet
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
-                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
-
-                // receive data response packet
-                uint8_t fpga_source;
-                size_t length;
-                do {
-                    length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
-                    fpga_source = rxbuf[3];
-                } while (fpga_source != UDP_FLASH);
-
-                writeProgress->SetValue((int)100*((float)i/(float)(stream_1KB)));
+                writeProgress->SetValue(i);
                 wxYield();
-
-                printf("WRITE: address = 0x%08x\r", flash_address);
+                usleep(5000);
 
             }
-            printf("WRITE: address = 0x%08x\n", flash_address);
 
         }
 
@@ -411,48 +225,13 @@ private:
         if (verifyCheckBox->IsChecked()) {
 
             printf("VERIFY\n");
-            int errors = 0;
-            uint8_t compare_buf[OneKB];
-            uint32_t flash_address;
-            ssize_t nBytes;
-            uint8_t flash_op;
-            ssize_t rxlength;
-            for (int i=0; i<stream_1KB; i++) {
+            for (int i=0; i<100; i++) {
 
-                // send read command
-                nBytes=8;
-                flash_address = RegionStart + OneKB*i;
-                flash_op = FLASH_OP_READ;
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
-                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
-
-                // receive data response packet
-                uint8_t fpga_source;
-                size_t length;
-                do {
-                    length = rx_socket->receive_from(boost::asio::buffer(rxbuf), remote_endpoint);
-                    fpga_source = rxbuf[3];
-                } while (fpga_source != UDP_FLASH);
-
-                // verify data
-                for (int j=0; j<OneKB; j++) {
-                    if ((OneKB*i+j) < binsize){
-                        compare_buf[j] = binstream[j+OneKB*i];
-                    } else {
-                        compare_buf[j] = 0xff;
-                    }
-                }
-                for (int i=8; i<length; i++) {
-                    if (rxbuf[i] != compare_buf[i-8]) { errors++; }
-                }
-
-                verifyProgress->SetValue((int)100*((float)i/(float)(stream_1KB)));
+                verifyProgress->SetValue(i);
                 wxYield();
+                usleep(5000);
 
-                printf("VERIFY: address = 0x%08x, errors = %d\r", flash_address, errors);
             }
-            printf("VERIFY: address = 0x%08x, errors = %d\n", flash_address, errors);
 
         }
 
@@ -460,67 +239,12 @@ private:
         // *** Reboot FPGA
         if (rebootCheckBox->IsChecked()) {
 
-            uint32_t flash_address;
-            ssize_t nBytes;
-            uint8_t flash_op;
-
-            {
-                nBytes = 16;
-                flash_address = RegionStart;
-                flash_op = FLASH_OP_REBOOT;
-                txbuf[0] = 0xaa; txbuf[1] = 0xbb; txbuf[2] = 0xcc; txbuf[3] = UDP_FLASH;
-                ((uint32_t *)txbuf)[1] = (flash_address&0xffffff00) | (flash_op);
-                tx_socket->send_to(boost::asio::buffer(std::string(txbuf,nBytes)), device_endpoint);
-            }
-
-            printf("REBOOT\n");
-
             rebootProgress->SetValue(100);
             wxYield();
         }
 
 
     }
-
-
-    void LoadNetworkInterfaces() {
-        struct ifaddrs* ifaddr;
-        if (getifaddrs(&ifaddr) == -1) {
-            wxMessageBox("Error fetching interfaces", "Error", wxICON_ERROR);
-            return;
-        }
-
-        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-            if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET && (ifa->ifa_flags & IFF_UP)) {
-                char ip[INET_ADDRSTRLEN] = {0};
-                struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;
-                inet_ntop(AF_INET, &sa->sin_addr, ip, INET_ADDRSTRLEN);
-                wxString ifaceEntry = wxString::Format("%s (%s)", ifa->ifa_name, ip);
-                interfaceChoice->Append(ifaceEntry);
-            }
-        }
-        freeifaddrs(ifaddr);
-    }
-
-
-    void SetIPAddress(const std::string& interface, const std::string& ipAddress) {
-        std::string command;
-        #ifdef __linux__
-            command = "sudo ifconfig " + interface + " " + ipAddress;
-        #elif _WIN32
-            command = "netsh interface ip set address name=\"" + interface + "\" static " + ipAddress + " 255.255.255.0";
-        #else
-            std::cerr << "Unsupported platform" << std::endl;
-            return;
-        #endif
-        if (system(command.c_str()) != 0) {
-            std::cerr << "Error setting IP address" << std::endl;
-            exit(1);
-        } else {
-            std::cerr << "interface = " << interface << ", IP address = " << ipAddress << std::endl;
-        }
-    }
-
 
 };
 
