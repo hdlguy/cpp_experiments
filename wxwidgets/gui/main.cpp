@@ -12,15 +12,6 @@
 #include <string>
 #include <thread>
 
-#ifdef __linux__ 
-    #include <ifaddrs.h>
-    #include <net/if.h>
-    #include <arpa/inet.h>
-#elif _WIN32
-#else
-    #error "OS not supported!"
-#endif
-
 //#include <boost/asio.hpp>
 #include <iostream>
 #include <stdio.h>
