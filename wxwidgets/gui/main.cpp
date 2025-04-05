@@ -10,9 +10,16 @@
 #include <wx/dynlib.h>
 #include <vector>
 #include <string>
-#include <ifaddrs.h>
-#include <net/if.h>
-#include <arpa/inet.h>
+#include <thread>
+
+#ifdef __linux__ 
+    #include <ifaddrs.h>
+    #include <net/if.h>
+    #include <arpa/inet.h>
+#elif _WIN32
+#else
+    #error "OS not supported!"
+#endif
 
 //#include <boost/asio.hpp>
 #include <iostream>
@@ -187,7 +194,7 @@ private:
 
                 eraseProgress->SetValue(i);
                 wxYield();
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
             }
 
@@ -201,7 +208,7 @@ private:
 
                 blankProgress->SetValue(i);
                 wxYield();
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
             }
 
@@ -215,7 +222,7 @@ private:
 
                 writeProgress->SetValue(i);
                 wxYield();
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
             }
 
@@ -229,7 +236,7 @@ private:
 
                 verifyProgress->SetValue(i);
                 wxYield();
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
             }
 
