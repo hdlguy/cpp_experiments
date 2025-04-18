@@ -237,6 +237,7 @@ private:
         // *** Reboot FPGA
         if (rebootCheckBox->IsChecked()) {
 
+            printf("REBOOT\n");
             rebootProgress->SetValue(100);
             wxYield();
         }
