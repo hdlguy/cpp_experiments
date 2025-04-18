@@ -1,14 +1,36 @@
 # Build Instructions for Example Application Using wxWidgets
 
-## Under Linux
+
+## Linux
 
 ### Install wxWidgets
 
-## Under MinGW
+### Build Application
+
+cd ~/github/cpp_experiments/wxwidgets/gui
+make
+
+
+## Windows 11
 
 ### Install MinGW
 
+https://github.com/msys2/msys2-installer/releases/download/2025-02-21/msys2-x86_64-20250221.exe
+
+pacman -S mingw-w64-ucrt-x86_64-gcc
+pacman -S git
+pacman -S vim
+pacman -S gmake
+...
+
 ### Install wxWidgets
+
+git clone https://github.com/wxWidgets/wxWidgets.git
+mkdir build-static 
+cd build-static
+../configure --disable-shared
+make
+make install
 
 ### Build Application
 
