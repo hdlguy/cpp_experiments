@@ -8,7 +8,7 @@
 ### Build Application
 
 cd ~/github/cpp_experiments/wxwidgets/gui
-make linux_Makefile
+make -f linux_Makefile
 ./wx_example
 
 ## Windows 11
@@ -39,6 +39,6 @@ make install
 
 ### Build Application
 
-make windows_Makefile
+make -f windows_Makefile
 ./wx_example.exe
 

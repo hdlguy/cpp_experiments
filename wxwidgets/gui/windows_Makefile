@@ -1,4 +1,4 @@
-wx_example: main.cpp  Makefile
+wx_example: main.cpp  windows_Makefile
 	g++ -o wx_example main.cpp `wx-config --cxxflags --libs` --static
 
 clean:
