@@ -34,17 +34,12 @@ int main()
     //SetIPAddress(network_interface, pc_ip);
 
     // setup tx socket
-    //boost::asio::io_service tx_io_service;
-    //udp::socket tx_socket(tx_io_service);
     boost::asio::io_context tx_io_context;
     udp::socket tx_socket(tx_io_context);
-    //udp::endpoint device_endpoint(boost::asio::ip::address::from_string(device_ip), port);
     udp::endpoint device_endpoint(boost::asio::ip::make_address(device_ip), port);
     tx_socket.open(udp::v4());
 
     // setup rx socket
-    //boost::asio::io_service rx_io_service;
-    //udp::socket rx_socket(rx_io_service, udp::endpoint(udp::v4(), port));
     boost::asio::io_context rx_io_context;
     udp::socket rx_socket(rx_io_context, udp::endpoint(udp::v4(), port));
     std::cout << "UDP server listening on port " << port << "..." << std::endl;
