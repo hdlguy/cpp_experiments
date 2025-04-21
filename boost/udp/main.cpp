@@ -73,7 +73,7 @@ int main()
     return 0;
 }
 
-
+/*
 void SetIPAddress(const std::string& interface, const std::string& ipAddress) {
     std::string command;
     #ifdef __linux__
@@ -92,4 +92,5 @@ void SetIPAddress(const std::string& interface, const std::string& ipAddress) {
         std::cerr << "interface = " << interface << ", IP address = " << ipAddress << std::endl;
     }
 }
+*/
 
