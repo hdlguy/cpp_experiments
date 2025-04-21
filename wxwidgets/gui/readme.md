@@ -22,15 +22,16 @@ Run MSYS2. /c is the Windows C: drive.
 pacman -S mingw-w64-ucrt-x86_64-gcc
 pacman -S git
 pacman -S vim
-pacman -S gmake
+pacman -S make
 ...
 
 ### Install wxWidgets
 
 Inside the MSYS2 shell
 
-git clone https://github.com/wxWidgets/wxWidgets.git
+git clone https://github.com/wxWidgets/wxWidgets.git --recurse-submodules
 cd wxWidgets
+git checkout 3.2
 mkdir build-static 
 cd build-static
 ../configure --disable-shared
