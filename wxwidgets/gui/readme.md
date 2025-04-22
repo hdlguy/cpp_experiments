@@ -29,9 +29,10 @@ pacman -S make
 
 Inside the MSYS2 shell
 
-git clone https://github.com/wxWidgets/wxWidgets.git --recurse-submodules
+git clone https://github.com/wxWidgets/wxWidgets.git
 cd wxWidgets
 git checkout 3.2
+git submodule update --init
 mkdir build-static 
 cd build-static
 ../configure --disable-shared
